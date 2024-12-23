@@ -130,7 +130,7 @@ class TimeTracker
      * Calculates the elapsed time for a timer.
      *
      * @param string $id The identifier for the timer.
-     * @return Result|null The TimeTracker instance or null if the timer does not exist.
+     * @return Result|null The Result instance or null if the timer does not exist.
      */
     public function calculate(string $id): ?Result
     {
