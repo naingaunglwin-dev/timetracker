@@ -250,4 +250,10 @@ class TimeTrackerTest extends TestCase
 
         $this->assertSame(['operator' => '*', 'value' => 1000], $definition);
     }
+
+    public function testResultToString(): void
+    {
+        $result = new Result(new Unit(), 10, 's');
+        $this->assertSame('10', "$result");
+    }
 }
