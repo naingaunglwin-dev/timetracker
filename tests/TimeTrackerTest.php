@@ -1,5 +1,6 @@
 <?php
 
+use NAL\TimeTracker\Exception\NoActiveTimerToStopException;
 use NAL\TimeTracker\Exception\TimerNotStarted;
 use PHPUnit\Framework\TestCase;
 use NAL\TimeTracker\TimeTracker;
@@ -19,7 +20,7 @@ class TimeTrackerTest extends TestCase
 
         $tracker->start($id);
         usleep(50000); // 50ms delay
-        $tracker->end($id);
+        $tracker->stop($id);
 
         $result = $tracker->calculate($id);
 
@@ -32,7 +33,7 @@ class TimeTrackerTest extends TestCase
         $this->expectException(TimerNotStarted::class);
         $tracker = new TimeTracker();
 
-        $tracker->end('invalid_timer');
+        $tracker->stop('invalid_timer');
     }
 
     public function testCalculateWithInvalidId()
@@ -54,7 +55,7 @@ class TimeTrackerTest extends TestCase
         $tracker->start($id);
         $this->assertSame(TimeTracker::STATUS_IN_PROGRESS, $tracker->status($id));
 
-        $tracker->end($id);
+        $tracker->stop($id);
         $this->assertSame(TimeTracker::STATUS_COMPLETED, $tracker->status($id));
     }
 
@@ -123,11 +124,11 @@ class TimeTrackerTest extends TestCase
 
         $tracker->start($id1);
         usleep(10000); // 10ms delay
-        $tracker->end($id1);
+        $tracker->stop($id1);
 
         $tracker->start($id2);
         usleep(20000); // 20ms delay
-        $tracker->end($id2);
+        $tracker->stop($id2);
 
         $durations = $tracker->durations();
 
@@ -143,8 +144,8 @@ class TimeTrackerTest extends TestCase
         // Start multiple timers
         $timeTracker->start('timer1');
         $timeTracker->start('timer2');
-        $timeTracker->end('timer1');
-        $timeTracker->end('timer2');
+        $timeTracker->stop('timer1');
+        $timeTracker->stop('timer2');
 
         // Verify timers exist
         $this->assertTrue($timeTracker->exists('timer1'));
@@ -255,5 +256,39 @@ class TimeTrackerTest extends TestCase
     {
         $result = new Result(new Unit(), 10, 's');
         $this->assertSame('10', "$result");
+    }
+
+    public function testStopWithoutSpecificId()
+    {
+        $timetracker = new TimeTracker();
+
+        $timetracker->start('timer1');
+
+        usleep(10000); // 10ms delay
+
+        $timetracker->stop();
+
+        $this->assertTrue($timetracker->exists('timer1'));
+    }
+
+    public function testStopThrowExceptionOnCallingWithoutActiveStartRecord()
+    {
+        $this->expectException(NoActiveTimerToStopException::class);
+
+        $timetracker = new TimeTracker();
+
+        $timetracker->start('timer1');
+        $timetracker->stop();
+        $timetracker->stop();
+    }
+
+    public function testStopThrowExceptionOnCallingWithoutStartRecord()
+    {
+        $this->expectException(TimerNotStarted::class);
+
+        $timetracker = new TimeTracker();
+
+        $timetracker->start('timer1');
+        $timetracker->stop('timer2'); //non-existing timer
     }
 }
