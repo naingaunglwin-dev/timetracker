@@ -5,6 +5,7 @@ namespace NAL\TimeTracker;
 use Illuminate\Container\Container;
 use InvalidArgumentException;
 use NAL\TimeTracker\Exception\InvalidUnitName;
+use NAL\TimeTracker\Exception\NoActiveTimerToStopException;
 use NAL\TimeTracker\Exception\TimerNotStarted;
 use NAL\TimeTracker\Exception\UnsupportedLogic;
 use Ramsey\Uuid\Uuid;
@@ -67,15 +68,51 @@ class TimeTracker
     }
 
     /**
+     * @codeCoverageIgnore
+     *
      * Ends a timer with the given ID.
      *
+     * @deprecated Use `stop()` instead
+     *
      * @param string $id The identifier for the timer.
+     *
      * @throws TimerNotStarted If the timer with the given ID has not been started.
      */
     public function end(string $id): void
     {
         if (!isset($this->start[$id])) {
             throw new TimerNotStarted($id);
+        }
+
+        $this->end[$id] = microtime(true);
+    }
+
+    /**
+     * Stops the specified timer or, if no ID is provided, the most recently started timer.
+     *
+     * @param string|null $id  The identifier of the timer to stop, or null to stop the last started timer.
+     *
+     * @throws TimerNotStarted  If no timer has been started, or the specified timer ID does not exist.
+     * @throws \RuntimeException If the specified timer has already been stopped.
+     *
+     * @return void
+     */
+    public function stop(?string $id = null): void
+    {
+        if (empty($this->start)) {
+            throw new TimerNotStarted($id);
+        }
+
+        if ($id === null) {
+            $id = array_key_last($this->start);
+        }
+
+        if (!isset($this->start[$id])) {
+            throw new TimerNotStarted($id);
+        }
+
+        if (isset($this->end[$id])) {
+            throw new NoActiveTimerToStopException();
         }
 
         $this->end[$id] = microtime(true);
