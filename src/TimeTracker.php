@@ -8,7 +8,6 @@ use NAL\TimeTracker\Exception\InvalidUnitName;
 use NAL\TimeTracker\Exception\NoActiveTimerToStopException;
 use NAL\TimeTracker\Exception\TimerNotStarted;
 use NAL\TimeTracker\Exception\UnsupportedLogic;
-use Ramsey\Uuid\Uuid;
 
 class TimeTracker
 {
@@ -130,7 +129,7 @@ class TimeTracker
     {
         $timeTracker = new self();
 
-        $randomId = Uuid::uuid4()->toString();
+        $randomId = bin2hex(random_bytes(16));
 
         $container = new Container();
 
