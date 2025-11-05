@@ -59,9 +59,9 @@ class TimeTrackerTest extends TestCase
         $this->assertSame(TimeTracker::STATUS_COMPLETED, $tracker->status($id));
     }
 
-    public function testRun(): void
+    public function testWatch(): void
     {
-        $result = TimeTracker::run(function () {
+        $result = TimeTracker::watch(function () {
             usleep(50000); // 50ms delay
         });
 
@@ -72,11 +72,11 @@ class TimeTrackerTest extends TestCase
         $this->assertGreaterThan(0, $result['time']);
     }
 
-    public function testRunWithExceptionThrow()
+    public function testWatchWithExceptionThrow()
     {
         $this->expectException(RuntimeException::class);
 
-        $result = TimeTracker::run(function () {
+        $result = TimeTracker::watch(function () {
             usleep(50000); // 50ms delay
             invalidFunction();
         });

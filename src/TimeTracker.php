@@ -125,7 +125,7 @@ class TimeTracker
      * @param string $unit The unit for measuring execution time.
      * @return array{result: Result, time: float|int, unit: string, output: mixed} An array containing Result, the execution time, unit, and callback result.
      */
-    public static function run(callable $callback, array $params = [], string $unit = 's'): array
+    public static function watch(callable $callback, array $params = [], string $unit = 's'): array
     {
         $timeTracker = new self();
 
@@ -140,7 +140,7 @@ class TimeTracker
             $output = $container->call($callback, $params);
 
         } catch (\Throwable $e) {
-            $timeTracker->end($randomId);
+            $timeTracker->stop($randomId);
 
             throw new \RuntimeException(
                 $timeTracker->calculate($randomId)->format('Error occurring during executing callback, end in %s%s')->get() .
@@ -149,7 +149,7 @@ class TimeTracker
                 $e
             );
         } finally {
-            $timeTracker->end($randomId);
+            $timeTracker->stop($randomId);
         }
 
         $result = $timeTracker->calculate($randomId);

@@ -132,7 +132,7 @@ echo $tracker->calculate('test')
 ### Time tracking with callback function
 - You can track time for a callback function and get both the execution time and the result:
 ```php
-$result = \NAL\TimeTracker\TimeTracker::run(
+$result = \NAL\TimeTracker\TimeTracker::watch(
     function (Conversation $conv, $time) {
         sleep(3);
         return $conv->greet($time) . '<br>do something at ' . $time;
