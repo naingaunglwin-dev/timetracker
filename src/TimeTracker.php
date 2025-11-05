@@ -25,27 +25,6 @@ class TimeTracker
      */
     private array $end = [];
 
-    /**
-     * Indicates a timer that has not been started.
-     *
-     * @var string
-     */
-    const string STATUS_NOT_STARTED = 'not started';
-
-    /**
-     * Indicates a timer that is in progress.
-     *
-     * @var string
-     */
-    const string STATUS_IN_PROGRESS = 'in progress';
-
-    /**
-     * Indicates a timer that has been completed.
-     *
-     * @var string
-     */
-    const string STATUS_COMPLETED = 'completed';
-
     private Unit $unit;
 
     /**
@@ -221,14 +200,14 @@ class TimeTracker
     public function status(string $id): string
     {
         if (!isset($this->start[$id])) {
-            return self::STATUS_NOT_STARTED;
+            return TimerStatus::NOT_STARTED->value;
         }
 
         if (!isset($this->end[$id])) {
-            return self::STATUS_IN_PROGRESS;
+            return TimerStatus::IN_PROGRESS->value;
         }
 
-        return self::STATUS_COMPLETED;
+        return TimerStatus::COMPLETED->value;
     }
 
     /**
