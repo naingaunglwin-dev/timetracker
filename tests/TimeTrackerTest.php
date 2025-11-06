@@ -2,6 +2,7 @@
 
 use NAL\TimeTracker\Exception\NoActiveTimerToStopException;
 use NAL\TimeTracker\Exception\TimerNotStarted;
+use NAL\TimeTracker\TimerStatus;
 use PHPUnit\Framework\TestCase;
 use NAL\TimeTracker\TimeTracker;
 use NAL\TimeTracker\Result;
@@ -50,13 +51,13 @@ class TimeTrackerTest extends TestCase
         $tracker = new TimeTracker();
         $id = 'test_timer';
 
-        $this->assertSame(TimeTracker::STATUS_NOT_STARTED, $tracker->status($id));
+        $this->assertSame(TimerStatus::NOT_STARTED->value, $tracker->status($id));
 
         $tracker->start($id);
-        $this->assertSame(TimeTracker::STATUS_IN_PROGRESS, $tracker->status($id));
+        $this->assertSame(TimerStatus::IN_PROGRESS->value, $tracker->status($id));
 
         $tracker->stop($id);
-        $this->assertSame(TimeTracker::STATUS_COMPLETED, $tracker->status($id));
+        $this->assertSame(TimerStatus::COMPLETED->value, $tracker->status($id));
     }
 
     public function testWatch(): void
