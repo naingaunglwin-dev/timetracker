@@ -97,6 +97,53 @@ class TimeTracker
     }
 
     /**
+     * Check whether timer with given id is started or not
+     *
+     * @param string $id
+     *
+     * @return bool
+     */
+    public function isStarted(string $id): bool
+    {
+        return array_key_exists($id, $this->start);
+    }
+
+    /**
+     * Check whether timer with given id is ended or not
+     *
+     * @param string $id
+     *
+     * @return bool
+     */
+    public function isStopped(string $id): bool
+    {
+        return array_key_exists($id, $this->end);
+    }
+
+    /**
+     * Get the current active timers' id
+     *
+     * @return array
+     */
+    public function getActiveTimers(): array
+    {
+        if ($this->start === []) {
+            return [];
+        }
+
+        $ids = array_keys($this->start);
+        $activeTimers = [];
+
+        foreach ($ids as $id) {
+            if (!$this->isStopped($id)) {
+                $activeTimers[] = $id;
+            }
+        }
+
+        return $activeTimers;
+    }
+
+    /**
      * Executes a callback while tracking its execution time.
      *
      * @param callable $callback The callback function to execute.

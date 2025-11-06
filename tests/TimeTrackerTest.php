@@ -292,4 +292,43 @@ class TimeTrackerTest extends TestCase
         $timetracker->start('timer1');
         $timetracker->stop('timer2'); //non-existing timer
     }
+
+    public function testIsStarted()
+    {
+        $timetracker = new TimeTracker();
+
+        $timetracker->start('timer1');
+
+        $this->assertTrue($timetracker->isStarted('timer1'));
+        $this->assertFalse($timetracker->isStarted('timer2'));
+    }
+
+    public function testIsStopped()
+    {
+        $timetracker = new TimeTracker();
+
+        $timetracker->start('timer1');
+        usleep(10000);
+        $timetracker->stop('timer1');
+
+        $this->assertTrue($timetracker->isStopped('timer1'));
+        $this->assertFalse($timetracker->isStopped('timer2'));
+    }
+
+    public function testGetEmptyActiveTimersWhenNoActiveRecord()
+    {
+        $timetracker = new TimeTracker();
+
+        $this->assertEmpty($timetracker->getActiveTimers());
+    }
+
+    public function testGetActiveTimers()
+    {
+        $timetracker = new TimeTracker();
+
+        $timetracker->start('timer1');
+        $timetracker->start('timer2');
+
+        $this->assertSame(['timer1', 'timer2'], $timetracker->getActiveTimers());
+    }
 }
