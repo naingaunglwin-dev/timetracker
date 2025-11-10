@@ -17,13 +17,25 @@
 - composer
 
 ## Installation via Composer
-To install, navigate to your project root directory (where `composer.json` is located) and run the following command:
-```shell
-  composer require naingaunglwin-dev/timetracker
+> If Composer is not installed, follow the [official guide](https://getcomposer.org/download/).
+
+1. Create a `composer.json` file at your project root directory (if you don't have one):
+```json
+{
+  "require": {
+    "naingaunglwin-dev/timetracker": "^1.0"
+  }
+}
 ```
-- If `composer.json` doesn't exits, run this command first,
-```shell
-  composer init
+
+- Run the following command in your terminal from the project's root directory:
+```bash
+composer install
+```
+
+If you already have `composer.json` file in your project, just run this command in your terminal,
+```bash
+composer require naingaunglwin-dev/timetracker
 ```
 
 ## Usage
@@ -40,7 +52,7 @@ $tracker->start('test');
 echo 'hello world<br>';
 sleep(3);
 
-$tracker->end('test');
+$tracker->stop('test');
 
 echo $tracker->calculate('test')
         ->get();
@@ -53,18 +65,12 @@ echo $tracker->calculate('test')
 ### Convert to different unit
 - By default, the unit is in seconds (s). You can convert to other predefined units like milliseconds (ms), microseconds (us), and more:
 ```php
-<?php
-
-require 'vendor/autoload.php';
-
-$tracker = new NAL\TimeTracker\TimeTracker();
-
 $tracker->start('test');
 
 echo 'hello world<br>';
 sleep(3);
 
-$tracker->end('test');
+$tracker->stop('test');
 
 echo $tracker->calculate('test')
         ->convert('ms')
@@ -78,18 +84,12 @@ echo $tracker->calculate('test')
 ### Add custom unit
 - You can define custom units based on seconds (for example, converting seconds to custom units):
 ```php
-<?php
-
-require 'vendor/autoload.php';
-
-$tracker = new NAL\TimeTracker\TimeTracker();
-
 $tracker->start('test');
 
 echo 'hello world<br>';
 sleep(3);
 
-$tracker->end('test');
+$tracker->stop('test');
 
 // Add a custom unit definition (1 second = 10 custom units)
 $tracker->addUnitDefinition('testunit', '*', 10);
@@ -106,18 +106,12 @@ echo $tracker->calculate('test')
 ### Format output
 - You can format the output of the calculated time using placeholders:
 ```php
-<?php
-
-require 'vendor/autoload.php';
-
-$tracker = new NAL\TimeTracker\TimeTracker();
-
 $tracker->start('test');
 
 echo 'hello world<br>';
 sleep(3);
 
-$tracker->end('test');
+$tracker->stop('test');
 
 echo $tracker->calculate('test')
         ->convert('ms')
@@ -132,15 +126,6 @@ echo $tracker->calculate('test')
 ### Time tracking with callback function
 - You can track time for a callback function and get both the execution time and the result:
 ```php
-$result = \NAL\TimeTracker\TimeTracker::watch(
-    function (Conversation $conv, $time) {
-        sleep(3);
-        return $conv->greet($time) . '<br>do something at ' . $time;
-    },
-    ['time' => 'evening'], //parameters variableName => value
-    'ms' // time unit, default is `s`
-);
-
 class Conversation
 {
     public function greet($time){
@@ -148,7 +133,14 @@ class Conversation
     }
 }
 
-var_dump($result);
+$watch = \NAL\TimeTracker\TimeTracker::watch(
+    function (Conversation $conv, $time) {
+        sleep(3);
+        return $conv->greet($time) . '<br>do something at ' . $time;
+    },
+    ['time' => 'evening'], //parameters variableName => value
+    'ms' // time unit, default is `s`
+);
 ```
 - Example output:
 ```php
@@ -159,4 +151,51 @@ array (size=4)
   'time' => float 3002.8040409088
   'unit' => string 'ms' (length=2)
   'output' => string 'good evening, do something at evening' (length=37)
+```
+
+### Checking timer states
+
+The following methods help you check timer states and get currently active timers.
+
+#### Check if a timer has started
+```php
+$tracker->start('download');
+
+if ($tracker->isStarted('download')) {
+    echo "Download timer is started.";
+}
+
+// Output:
+// Download timer is started.
+```
+
+#### Check if a timer has stopped
+```php
+$tracker->start('process');
+
+sleep(1);
+
+$tracker->stop('process');
+
+if ($tracker->isStopped('process')) {
+    echo "Process timer is stopped.";
+}
+
+// Output:
+// Process timer is stopped.
+```
+
+#### Get currently active timers
+```php
+$tracker->start('task1');
+$tracker->start('task2');
+$tracker->stop('task1');
+
+print_r($tracker->getActiveTimers());
+
+// Output:
+// Array
+// (
+//     [0] => task2
+// )
 ```
