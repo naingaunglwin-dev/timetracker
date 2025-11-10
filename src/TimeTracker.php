@@ -175,7 +175,9 @@ class TimeTracker
                 $e
             );
         } finally {
-            $timeTracker->stop($randomId);
+            if (!$timeTracker->isStopped($randomId)) {
+                $timeTracker->stop($randomId);
+            }
         }
 
         $result = $timeTracker->calculate($randomId);
