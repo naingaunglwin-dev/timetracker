@@ -118,4 +118,12 @@ class Result
             default => throw new UnsupportedLogic("Unsupported operator '{$operator}' in unit definition."),
         };
     }
+
+    /**
+     * @return string
+     */
+    public function __toString(): string
+    {
+        return $this->calculated;
+    }
 }
