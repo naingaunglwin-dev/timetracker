@@ -5,8 +5,11 @@ namespace NAL\TimeTracker;
 use Illuminate\Container\Container;
 use InvalidArgumentException;
 use NAL\TimeTracker\Exception\InvalidUnitName;
+use NAL\TimeTracker\Exception\NoActivePausedTimerToResume;
 use NAL\TimeTracker\Exception\NoActiveTimerToStopException;
+use NAL\TimeTracker\Exception\TimerAlreadyPaused;
 use NAL\TimeTracker\Exception\TimerNotStarted;
+use NAL\TimeTracker\Exception\UnmatchedPauseWithoutResume;
 use NAL\TimeTracker\Exception\UnsupportedLogic;
 
 class TimeTracker
@@ -24,6 +27,27 @@ class TimeTracker
      * @var array
      */
     private array $end = [];
+
+    /**
+     * Stores pause times of tracked operations by ID.
+     *
+     * @var array
+     */
+    private array $pause = [];
+
+    /**
+     * Stores resume times of tracked operations by ID.
+     *
+     * @var array
+     */
+    private array $resume = [];
+
+    /**
+     * Stores laps of tracked operations by ID.
+     *
+     * @var array
+     */
+    private array $laps = [];
 
     private Unit $unit;
 
@@ -94,6 +118,106 @@ class TimeTracker
         }
 
         $this->end[$id] = microtime(true);
+    }
+
+    /**
+     * Records a lap time for the specified timer.
+     *
+     * A lap represents a checkpoint within an ongoing timer session. Each lap is recorded
+     * with its timestamp and an optional description for context.
+     *
+     * @param string $id           The identifier of the timer.
+     * @param string $description  An optional label or note for this lap (default: empty string).
+     *
+     * @throws TimerNotStarted If the timer with the given ID has not been started.
+     *
+     * @return void
+     */
+    public function lap(string $id, string $description = ''): void
+    {
+        if (!isset($this->start[$id])) {
+            throw new TimerNotStarted($id);
+        }
+
+        $this->laps[$id][] = [
+            'description' => $description,
+            'time' => microtime(true)
+        ];
+    }
+
+    /**
+     * Retrieves all recorded laps for a given timer.
+     *
+     * Each lap contains its timestamp and optional description.
+     * If no laps have been recorded, an empty array is returned.
+     *
+     * @param string $id  The identifier of the timer.
+     *
+     * @return array<int, array{description: string, time: float}>  A list of laps with their details.
+     */
+    public function getLaps(string $id): array
+    {
+        return $this->laps[$id] ?? [];
+    }
+
+    /**
+     * Pauses the specified timer.
+     *
+     * If the timer is already paused and not yet resumed, this method throws an exception.
+     * Each pause event is recorded with a timestamp and an optional description.
+     *
+     * @param string $id           The identifier of the timer.
+     * @param string $description  An optional label or note for this pause (default: empty string).
+     *
+     * @throws TimerNotStarted If the timer with the given ID has not been started.
+     * @throws TimerAlreadyPaused If the timer is already paused.
+     *
+     * @return void
+     */
+    public function pause(string $id, string $description = ''): void
+    {
+        if (!isset($this->start[$id])) {
+            throw new TimerNotStarted($id);
+        }
+
+        if (isset($this->pause[$id]) && count($this->pause[$id]) > count($this->resume[$id] ?? [])) {
+            throw new TimerAlreadyPaused($id);
+        }
+
+        $this->pause[$id][] = [
+            'description' => $description,
+            'time' => microtime(true)
+        ];
+    }
+
+    /**
+     * Resumes a previously paused timer.
+     *
+     * A timer can only be resumed if it has an active pause entry that has not yet been resumed.
+     * Each resume event is recorded with a timestamp and an optional description.
+     *
+     * @param string $id           The identifier of the timer.
+     * @param string $description  An optional label or note for this resume (default: empty string).
+     *
+     * @throws TimerNotStarted If the timer with the given ID has not been started.
+     * @throws NoActivePausedTimerToResume If there is no active pause to resume.
+     *
+     * @return void
+     */
+    public function resume(string $id, string $description = ''): void
+    {
+        if (!isset($this->start[$id])) {
+            throw new TimerNotStarted($id);
+        }
+
+        if (!isset($this->pause[$id]) || count($this->pause[$id]) === count($this->resume[$id] ?? [])) {
+            throw new NoActivePausedTimerToResume($id);
+        }
+
+        $this->resume[$id][] = [
+            'description' => $description,
+            'time' => microtime(true)
+        ];
     }
 
     /**
@@ -195,6 +319,8 @@ class TimeTracker
      *
      * @param string $id The identifier for the timer.
      * @return Result|null The Result instance or null if the timer does not exist.
+     *
+     * @throws UnmatchedPauseWithoutResume
      */
     public function calculate(string $id): ?Result
     {
@@ -202,8 +328,25 @@ class TimeTracker
             return null;
         }
 
-        return new Result($this->unit, $this->end[$id] - $this->start[$id], 's');
+        $calculate = $this->end[$id] - $this->start[$id];
+
+        $pausedTime = 0;
+
+        if (!empty($this->pause[$id]) && !empty($this->resume[$id])) {
+            foreach ($this->pause[$id] as $index => $pauseTime) {
+                if (isset($this->resume[$id][$index])) {
+                    $pausedTime += $this->resume[$id][$index]['time'] - $pauseTime['time'];
+                } else {
+                    throw new UnmatchedPauseWithoutResume($id);
+                }
+            }
+        }
+
+        $calculate -= $pausedTime;
+
+        return new Result($this->unit, $calculate, 's');
     }
+
 
     /**
      * Adds a custom unit definition based on seconds.
@@ -296,5 +439,31 @@ class TimeTracker
     public function getUnit(): Unit
     {
         return $this->unit;
+    }
+
+    /**
+     * Inspects and retrieves detailed timing data for a specific timer.
+     *
+     * @param string $id  The identifier of the timer to inspect.
+     *
+     * @return array{
+     *     start: float|null,
+     *     end: float|null,
+     *     paused: array<int, array{description: string, time: float}>,
+     *     resumed: array<int, array{description: string, time: float}>,
+     *     status: string,
+     *     laps: array<int, array{description: string, time: float}>
+     * }  A structured array containing all tracked data for the specified timer.
+     */
+    public function inspect(string $id): array
+    {
+        return [
+            'start'   => $this->start[$id] ?? null,
+            'end'     => $this->end[$id] ?? null,
+            'paused'  => $this->pause[$id] ?? [],
+            'resumed' => $this->resume[$id] ?? [],
+            'status'  => $this->status($id),
+            'laps'    => $this->laps[$id] ?? []
+        ];
     }
 }

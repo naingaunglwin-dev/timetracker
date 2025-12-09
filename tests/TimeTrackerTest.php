@@ -1,7 +1,10 @@
 <?php
 
+use NAL\TimeTracker\Exception\NoActivePausedTimerToResume;
 use NAL\TimeTracker\Exception\NoActiveTimerToStopException;
+use NAL\TimeTracker\Exception\TimerAlreadyPaused;
 use NAL\TimeTracker\Exception\TimerNotStarted;
+use NAL\TimeTracker\Exception\UnmatchedPauseWithoutResume;
 use NAL\TimeTracker\TimerStatus;
 use PHPUnit\Framework\TestCase;
 use NAL\TimeTracker\TimeTracker;
@@ -330,5 +333,205 @@ class TimeTrackerTest extends TestCase
         $timetracker->start('timer2');
 
         $this->assertSame(['timer1', 'timer2'], $timetracker->getActiveTimers());
+    }
+
+    public function testLap()
+    {
+        $timetracker = new TimeTracker();
+
+        $timetracker->start('timer1');
+
+        usleep(10000); // 10ms delay
+        $timetracker->lap('timer1', "After 10ms delay");
+
+        usleep(20000); // 20ms delay
+        $timetracker->lap('timer1', "After 20ms delay");
+
+        $timetracker->stop();
+
+        $laps = $timetracker->getLaps('timer1');
+
+        $this->assertNotEmpty($laps);
+
+        $expected = [10, 20];
+        foreach ($laps as $index => $lap) {
+            $this->assertSame("After {$expected[$index]}ms delay", $lap['description']);
+        }
+    }
+
+    public function testLapThrowExceptionOnCallingWithoutTimerStarted()
+    {
+        $this->expectException(TimerNotStarted::class);
+
+        $timetracker = new TimeTracker();
+
+        $timetracker->lap('timer1');
+    }
+
+    public function testPauseThrowsExceptionIfTimerNotStarted()
+    {
+        $tracker = new TimeTracker();
+
+        $this->expectException(TimerNotStarted::class);
+
+        $tracker->pause('task');
+    }
+
+    public function testPauseWorksWhenTimerIsStarted()
+    {
+        $tracker = new TimeTracker();
+
+        $tracker->start('task');
+        $tracker->pause('task', 'first pause');
+
+        $inspectData = $tracker->inspect('task');
+        $pauseData = $inspectData['paused'][0];
+
+        $this->assertSame('first pause', $pauseData['description']);
+        $this->assertIsFloat($pauseData['time']);
+    }
+
+    public function testPauseThrowsIfAlreadyPausedAndNotResumed()
+    {
+        $tracker = new TimeTracker();
+
+        $tracker->start('task');
+        $tracker->pause('task');
+
+        $this->expectException(TimerAlreadyPaused::class);
+
+        // second pause should fail
+        $tracker->pause('task');
+    }
+
+    public function testResumeThrowsExceptionIfTimerNotStarted()
+    {
+        $tracker = new TimeTracker();
+
+        $this->expectException(TimerNotStarted::class);
+
+        $tracker->resume('task');
+    }
+
+    public function testResumeThrowsIfNoActivePause()
+    {
+        $tracker = new TimeTracker();
+        $tracker->start('task');
+
+        $this->expectException(NoActivePausedTimerToResume::class);
+
+        $tracker->resume('task');
+    }
+
+    public function testResumeWorksAfterPause()
+    {
+        $tracker = new TimeTracker();
+
+        $tracker->start('task');
+        $tracker->pause('task', 'pause point');
+        usleep(10_000);
+        $tracker->resume('task', 'resume point');
+
+        $inspectData = $tracker->inspect('task');
+        $resumeData = $inspectData['resumed'][0];
+
+        $this->assertSame('resume point', $resumeData['description']);
+        $this->assertIsFloat($resumeData['time']);
+    }
+
+    public function testMultiplePauseResumeCycles()
+    {
+        $tracker = new TimeTracker();
+
+        $tracker->start('task');
+
+        $tracker->pause('task');
+        usleep(5000);
+        $tracker->resume('task');
+
+        $tracker->pause('task');
+        usleep(5000);
+        $tracker->resume('task');
+
+        $tracker->stop();
+
+        $tracker->calculate('task');
+
+        $this->assertTrue(true);
+    }
+
+    public function testCalculateThrowsExceptionForUnmatchedPause()
+    {
+        $tracker = new TimeTracker();
+
+        $id = 'task';
+
+        // Start timer and create pause/resume cycle with unmatched pause
+        $tracker->start($id);
+        usleep(5000);
+
+        $tracker->pause($id, 'first pause');
+        $tracker->resume($id, 'first resume');
+        $tracker->pause($id, 'second pause');
+
+        $tracker->stop($id);
+
+        $this->expectException(UnmatchedPauseWithoutResume::class);
+        $this->expectExceptionMessage("Unmatched pause without resume for timer with ID '{$id}'");
+
+        $tracker->calculate($id);
+    }
+
+    public function testInspectMethod()
+    {
+        $tracker = new TimeTracker();
+        $id = 'inspect_timer';
+
+        // Test inspect for non-started timer
+        $inspectData = $tracker->inspect($id);
+        $this->assertNull($inspectData['start']);
+        $this->assertNull($inspectData['end']);
+        $this->assertEmpty($inspectData['paused']);
+        $this->assertEmpty($inspectData['resumed']);
+        $this->assertSame(TimerStatus::NOT_STARTED->value, $inspectData['status']);
+        $this->assertEmpty($inspectData['laps']);
+
+        // Start timer and add comprehensive data
+        $tracker->start($id);
+        usleep(5000);
+
+        $tracker->lap($id, 'First checkpoint');
+        usleep(3000);
+
+        $tracker->pause($id, 'Taking a break');
+        usleep(2000);
+        $tracker->resume($id, 'Back to work');
+        usleep(4000);
+
+        $tracker->lap($id, 'Second checkpoint');
+
+        $tracker->stop($id);
+
+        $inspectData = $tracker->inspect($id);
+
+        $this->assertIsFloat($inspectData['start']);
+        $this->assertIsFloat($inspectData['end']);
+        $this->assertGreaterThan($inspectData['start'], $inspectData['end']);
+
+        $this->assertCount(1, $inspectData['paused']);
+        $this->assertSame('Taking a break', $inspectData['paused'][0]['description']);
+        $this->assertIsFloat($inspectData['paused'][0]['time']);
+
+        $this->assertCount(1, $inspectData['resumed']);
+        $this->assertSame('Back to work', $inspectData['resumed'][0]['description']);
+        $this->assertIsFloat($inspectData['resumed'][0]['time']);
+
+        $this->assertSame(TimerStatus::COMPLETED->value, $inspectData['status']);
+
+        $this->assertCount(2, $inspectData['laps']);
+        $this->assertSame('First checkpoint', $inspectData['laps'][0]['description']);
+        $this->assertSame('Second checkpoint', $inspectData['laps'][1]['description']);
+        $this->assertIsFloat($inspectData['laps'][0]['time']);
+        $this->assertIsFloat($inspectData['laps'][1]['time']);
     }
 }
