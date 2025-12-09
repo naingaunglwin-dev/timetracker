@@ -1,6 +1,6 @@
 # ChangeLog
 
-## v1.1.0
+## v1.1.0 - 2025-12-09
 ### Added
 - Implemented `__toString()` method for the `Result` class, allowing instances to be converted to strings (e.g. `"$result"` now returns the calculated value). (PR #1)
 - Added new `stop()` method to the timer, supporting stopping: (PR #2)
