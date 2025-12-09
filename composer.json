@@ -2,7 +2,6 @@
     "name": "naingaunglwin-dev/timetracker",
     "description": "A lightweight time tracker for php",
     "minimum-stability": "stable",
-    "version": "1.0.0",
     "type": "library",
     "prefer-stable": true,
     "license": "MIT",
