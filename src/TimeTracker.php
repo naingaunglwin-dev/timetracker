@@ -268,6 +268,57 @@ class TimeTracker
     }
 
     /**
+     * @codeCoverageIgnore
+     *
+     * Executes a callback while tracking its execution time.
+     *
+     * @deprecated Use `watch` instead
+     *
+     * @param callable $callback The callback function to execute.
+     * @param array $params Parameters to pass to the callback.
+     * @param string $unit The unit for measuring execution time.
+     * @return array{result: Result, time: float|int, unit: string, output: mixed} An array containing Result, the execution time, unit, and callback result.
+     */
+    public static function run(callable $callback, array $params = [], string $unit = 's'): array
+    {
+        $timeTracker = new self();
+
+        $randomId = bin2hex(random_bytes(16));
+
+        $container = new Container();
+
+        $timeTracker->start($randomId);
+
+        try {
+
+            $output = $container->call($callback, $params);
+
+        } catch (\Throwable $e) {
+            $timeTracker->stop($randomId);
+
+            throw new \RuntimeException(
+                $timeTracker->calculate($randomId)->format('Error occurring during executing callback, end in %s%s')->get() .
+                "\n{$e->getMessage()}",
+                $e->getCode(),
+                $e
+            );
+        } finally {
+            if (!$timeTracker->isStopped($randomId)) {
+                $timeTracker->stop($randomId);
+            }
+        }
+
+        $result = $timeTracker->calculate($randomId);
+
+        return [
+            'result' => $result,
+            'time'   => $result->convert($unit)->get(),
+            'unit'   => $unit,
+            'output' => $output ?? null
+        ];
+    }
+
+    /**
      * Executes a callback while tracking its execution time.
      *
      * @param callable $callback The callback function to execute.
