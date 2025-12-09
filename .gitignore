@@ -10,6 +10,10 @@ vendor/
 # Ignore PHPUnit configuration file (if you're using phpunit.xml for local customizations)
 phpunit.xml
 
+# Ignore PHPUnit test result output files
+.phpunit.cache
+coverage-report
+
 # Ignore Composer lock file if you don't want to share it (usually, you want to commit composer.lock)
 # composer.lock
 
