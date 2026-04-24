@@ -6,7 +6,7 @@ use NAL\TimeTracker\Exception\DivisionByZero;
 use NAL\TimeTracker\Exception\UnknownUnit;
 use NAL\TimeTracker\Exception\UnsupportedLogic;
 
-class Result
+final class Result
 {
     /**
      * Result Constructor
@@ -27,14 +27,23 @@ class Result
     }
 
     /**
-     * Formats the calculated time.
+     * Formats the calculated time using a named-placeholder template.
      *
-     * @param string $format The format string, where `%s` is replaced with the time and unit.
-     * @return Result
+     * Supported placeholders:
+     * - `{time}`: the calculated value
+     * - `{unit}`: the current unit
+     *
+     * @param string $format The template string. Defaults to `{time} {unit}`.
+     * @return Result A new result instance containing the formatted string.
      */
-    public function format(string $format = '%s %s'): Result
+    public function format(string $format = '{time} {unit}'): Result
     {
-        return new self($this->unit, sprintf($format, $this->calculated, $this->lastUpdatedUnit), $this->lastUpdatedUnit);
+        $replace = [
+            '{time}' => $this->calculated,
+            '{unit}' => $this->lastUpdatedUnit,
+        ];
+
+        return new self($this->unit, str_replace(array_keys($replace),array_values($replace), $format), $this->lastUpdatedUnit);
     }
 
     /**
@@ -58,7 +67,7 @@ class Result
      */
     public function convert(string $unit): Result
     {
-        if (!in_array($unit, $this->unit->getSupportedUnits())) {
+        if (!in_array($unit, $this->unit->getSupportedUnits(), true)) {
             throw new UnknownUnit($unit, $this->unit->getSupportedUnits());
         }
 
