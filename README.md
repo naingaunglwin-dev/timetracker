@@ -2,9 +2,9 @@
 
 # TimeTracker
 
-![Status](https://img.shields.io/badge/test-pass-green)
-![Status](https://img.shields.io/badge/coverage-100%25-green)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+<a href="https://github.com/naingaunglwin-dev/timetracker/actions"><img src="https://github.com/naingaunglwin-dev/timetracker/actions/workflows/tests.yml/badge.svg" alt="GitHub CI Status"></a>
+<a href="https://github.com/naingaunglwin-dev/dotenv/"><img src="https://img.shields.io/badge/coverage-100%25-green" alt="Code Coverage"></a>
+<a href="https://github.com/naingaunglwin-dev/dotenv/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 
 </div>
 
