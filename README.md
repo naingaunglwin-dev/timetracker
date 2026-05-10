@@ -23,7 +23,7 @@
 ```json
 {
   "require": {
-    "naingaunglwin-dev/timetracker": "^1.0"
+    "naingaunglwin-dev/timetracker": "^2.0"
   }
 }
 ```
@@ -104,7 +104,7 @@ echo $tracker->calculate('test')
 ```
 
 ### Format output
-- You can format the output of the calculated time using placeholders:
+- You can format the output of the calculated time using named placeholders:
 ```php
 $tracker->start('test');
 
@@ -115,16 +115,46 @@ $tracker->stop('test');
 
 echo $tracker->calculate('test')
         ->convert('ms')
-        ->format('Executed at %s%s') // Change format to suit your needs (default: '%s %s')
+        ->format('Executed in {time}{unit}') // Default: '{time} {unit}'
         ->get();
 
 // Output:
 // hello world
-// Executed at 3009.4430446625ms
+// Executed in 3009.4430446625ms
+```
+
+### Access raw and formatted result values
+- `Result::get()` returns the raw value by default, or the formatted string after `format()` is used.
+- `Result::value()` always returns the raw numeric value.
+- `Result::unit()` returns the current unit.
+- `Result::toArray()` returns a structured representation of the result.
+```php
+$result = $tracker->calculate('test')
+        ->convert('ms')
+        ->format('Executed in {time}{unit}');
+
+echo $result->get();
+// Executed in 3009.4430446625ms
+
+echo $result->value();
+// 3009.4430446625
+
+echo $result->unit();
+// ms
+
+print_r($result->toArray());
+
+// Output:
+// Array
+// (
+//     [time] => 3009.4430446625
+//     [unit] => ms
+//     [formatted] => Executed in 3009.4430446625ms
+// )
 ```
 
 ### Time tracking with callback function
-- You can track time for a callback function and get both the execution time and the result:
+- You can track time for a callback function and get both the callback result and the execution time:
 ```php
 class Conversation
 {
@@ -138,19 +168,17 @@ $watch = \NAL\TimeTracker\TimeTracker::watch(
         sleep(3);
         return $conv->greet($time) . '<br>do something at ' . $time;
     },
-    ['time' => 'evening'], //parameters variableName => value
-    'ms' // time unit, default is `s`
+    ['time' => 'evening'] // parameters variableName => value
 );
+
+echo $watch['result'];
+echo $watch['time']->convert('ms')->format('{time}{unit}')->get();
 ```
 - Example output:
 ```php
-array (size=4)
-  'result' => 
-    object(NAL\TimeTracker\Result)[39]
-      ...
-  'time' => float 3002.8040409088
-  'unit' => string 'ms' (length=2)
-  'output' => string 'good evening, do something at evening' (length=37)
+array (size=2)
+  'result' => string 'good evening<br>do something at evening'
+  'time' => object(NAL\TimeTracker\Result)
 ```
 
 ### Checking timer states
@@ -198,4 +226,135 @@ print_r($tracker->getActiveTimers());
 // (
 //     [0] => task2
 // )
+```
+
+#### Check timer status
+```php
+$tracker->start('import');
+
+echo $tracker->status('import');
+
+// Output:
+// in progress
+```
+
+#### Check if a completed timer exists
+```php
+$tracker->start('report');
+$tracker->stop('report');
+
+if ($tracker->exists('report')) {
+    echo "Report timer exists.";
+}
+
+// Output:
+// Report timer exists.
+```
+
+### Get all durations
+- `durations()` returns completed timers converted to the requested unit. By default, it converts to milliseconds and formats each value as `{time} {unit}`.
+```php
+$tracker->start('task1');
+usleep(10000);
+$tracker->stop('task1');
+
+$tracker->start('task2');
+usleep(20000);
+$tracker->stop('task2');
+
+print_r($tracker->durations());
+
+// Output:
+// Array
+// (
+//     [task1] => 10.123 ms
+//     [task2] => 20.456 ms
+// )
+```
+
+- Pass an empty format string if you want raw numeric durations:
+```php
+print_r($tracker->durations('ms', ''));
+
+// Output:
+// Array
+// (
+//     [task1] => 10.123
+//     [task2] => 20.456
+// )
+```
+
+### Record laps
+- Laps mark checkpoints inside a running timer.
+```php
+$tracker->start('build');
+
+usleep(10000);
+$tracker->lap('build', 'Dependencies installed');
+
+usleep(20000);
+$tracker->lap('build', 'Assets compiled');
+
+$tracker->stop('build');
+
+print_r($tracker->getLaps('build'));
+
+// Output:
+// Array
+// (
+//     [0] => Array
+//         (
+//             [description] => Dependencies installed
+//             [time] => 1760000000.1234
+//         )
+//     [1] => Array
+//         (
+//             [description] => Assets compiled
+//             [time] => 1760000000.5678
+//         )
+// )
+```
+
+### Pause and resume a timer
+- Paused time is excluded from the final calculated duration.
+```php
+$tracker->start('download');
+
+usleep(10000);
+$tracker->pause('download', 'Waiting for network');
+
+usleep(50000);
+$tracker->resume('download', 'Network resumed');
+
+usleep(10000);
+$tracker->stop('download');
+
+echo $tracker->calculate('download')
+        ->convert('ms')
+        ->format('{time} {unit}')
+        ->get();
+```
+
+### Inspect a timer
+- `inspect()` returns the raw tracked data for a timer, including start, end, pause, resume, lap, and status values.
+```php
+print_r($tracker->inspect('download'));
+
+// Output:
+// Array
+// (
+//     [start] => 1760000000.1234
+//     [end] => 1760000000.2345
+//     [paused] => Array(...)
+//     [resumed] => Array(...)
+//     [status] => completed
+//     [laps] => Array(...)
+// )
+```
+
+### Reset timers
+```php
+$tracker->reset('download'); // Reset one timer
+
+$tracker->reset(); // Reset all timers
 ```
