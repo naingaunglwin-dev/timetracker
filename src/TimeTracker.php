@@ -273,7 +273,7 @@ class TimeTracker
      * @param callable $callback The callback function to execute.
      * @param array $params Parameters to pass to the callback.
      * @param string $unit The unit for measuring execution time.
-     * @return array{result: Result, time: float|int, unit: string, output: mixed} An array containing Result, the execution time, unit, and callback result.
+     * @return array{result: mixed, time: Result} An array containing Time Result and callback result.
      */
     public static function watch(callable $callback, array $params = [], string $unit = 's'): array
     {
@@ -287,13 +287,13 @@ class TimeTracker
 
         try {
 
-            $output = $container->call($callback, $params);
+            $result = $container->call($callback, $params);
 
         } catch (\Throwable $e) {
             $timeTracker->stop($randomId);
 
             throw new \RuntimeException(
-                $timeTracker->calculate($randomId)->format('Error occurring during executing callback, end in %s%s')->get() .
+                $timeTracker->calculate($randomId)->format('Error occurring during executing callback, ended in {time}{unit}')->get() .
                 "\n{$e->getMessage()}",
                 $e->getCode(),
                 $e
@@ -304,13 +304,11 @@ class TimeTracker
             }
         }
 
-        $result = $timeTracker->calculate($randomId);
+        $executionTime = $timeTracker->calculate($randomId);
 
         return [
-            'result' => $result,
-            'time'   => $result->convert($unit)->get(),
-            'unit'   => $unit,
-            'output' => $output ?? null
+            'result' => $result ?? null,
+            'time' => $executionTime
         ];
     }
 
@@ -427,7 +425,7 @@ class TimeTracker
             $calculate = $this->calculate($id)->convert($unit);
 
             if (!empty($format)) {
-                $calculate->format($format);
+                $calculate = $calculate->format($format);
             }
 
             $result[$id] = $calculate->get();

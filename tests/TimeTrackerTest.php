@@ -68,9 +68,7 @@ class TimeTrackerTest extends TestCase
 
         $this->assertArrayHasKey('result', $result);
         $this->assertArrayHasKey('time', $result);
-        $this->assertArrayHasKey('unit', $result);
-        $this->assertArrayHasKey('output', $result);
-        $this->assertGreaterThan(0, $result['time']);
+        $this->assertGreaterThan(0, $result['time']->get());
     }
 
     public function testWatchWithExceptionThrow(): void
@@ -136,6 +134,10 @@ class TimeTrackerTest extends TestCase
         $this->assertCount(2, $durations);
         $this->assertArrayHasKey($id1, $durations);
         $this->assertArrayHasKey($id2, $durations);
+        $this->assertIsString($durations[$id1]);
+        $this->assertIsString($durations[$id2]);
+        $this->assertStringEndsWith(' ms', $durations[$id1]);
+        $this->assertStringEndsWith(' ms', $durations[$id2]);
     }
 
     public function testResetFunctionality(): void

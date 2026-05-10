@@ -12,16 +12,15 @@ final class Result
      * Result Constructor
      *
      * @param Unit $unit The unit system used for calculations.
-     * @param float|int|string|null $calculated The initial calculated time value. It can be:
-     *   - `float` or `int` for numerical results,
-     *   - `string` for formatted or raw values,
-     *   - `null` if the value is not yet calculated.
+     * @param float|int|null $calculated The raw calculated time value.
      * @param string $lastUpdatedUnit The unit associated with the calculated value, e.g., 's' for seconds.
+     * @param string|null $format The optional display format template.
      */
     public function __construct(
         private readonly Unit $unit,
-        private readonly null|float|int|string $calculated,
-        private string $lastUpdatedUnit
+        private readonly null|float|int $calculated,
+        private readonly string $lastUpdatedUnit,
+        private readonly ?string $format = null
     )
     {
     }
@@ -34,26 +33,45 @@ final class Result
      * - `{unit}`: the current unit
      *
      * @param string $format The template string. Defaults to `{time} {unit}`.
-     * @return Result A new result instance containing the formatted string.
+     * @return Result A new result instance containing the selected display format.
      */
     public function format(string $format = '{time} {unit}'): Result
     {
-        $replace = [
-            '{time}' => $this->calculated,
-            '{unit}' => $this->lastUpdatedUnit,
-        ];
-
-        return new self($this->unit, str_replace(array_keys($replace),array_values($replace), $format), $this->lastUpdatedUnit);
+        return new self($this->unit, $this->calculated, $this->lastUpdatedUnit, $format);
     }
 
     /**
      * Retrieves the calculated time.
      *
-     * @return float|int|string|null The calculated time.
+     * @return float|int|string|null The raw calculated time, or the formatted value when a format is set.
      */
     public function get(): float|int|string|null
     {
+        if ($this->format !== null && $this->calculated !== null) {
+            return $this->render($this->format);
+        }
+
         return $this->calculated;
+    }
+
+    /**
+     * Retrieves the raw calculated time without applying formatting.
+     *
+     * @return float|int|null The raw calculated time.
+     */
+    public function value(): float|int|null
+    {
+        return $this->calculated;
+    }
+
+    /**
+     * Retrieves the current unit for the calculated time.
+     *
+     * @return string The current unit.
+     */
+    public function unit(): string
+    {
+        return $this->lastUpdatedUnit;
     }
 
     /**
@@ -72,12 +90,12 @@ final class Result
         }
 
         $calculated = $this->calculated;
+        $lastUpdatedUnit = $this->lastUpdatedUnit;
 
         if ($this->calculated !== null) {
 
-            if ($this->lastUpdatedUnit !== 's') {
-                $calculated = $this->convertToSecond();
-                $this->lastUpdatedUnit = 's';
+            if ($lastUpdatedUnit !== 's') {
+                $calculated = $this->convertToSecond($calculated, $lastUpdatedUnit);
             }
 
             if ($unit !== 's') {
@@ -87,23 +105,25 @@ final class Result
             }
         }
 
-        return new self($this->unit, $calculated, $unit);
+        return new self($this->unit, $calculated, $unit, $this->format);
     }
 
     /**
      * Converts the calculated time to seconds based on the current unit.
      *
      * This adjusts the calculated time from the current unit to seconds using
-     * the conversion factor defined in the unitDefinitions array. It modifies the
-     * `calculated` property and sets the `lastUpdatedUnit` to 's' (seconds).
+     * the conversion factor defined in the unitDefinitions array.
      *
+     * @param float|int $calculated The calculated value to convert.
+     * @param string $unit The current unit of the calculated value.
+     * @return float|int The calculated value converted to seconds.
      * @throws UnsupportedLogic If the operator defined for the current unit is not supported.
      */
-    private function convertToSecond(): null|string|float|int
+    private function convertToSecond(float|int $calculated, string $unit): float|int
     {
-        $definition = $this->unit->getUnitDefinitions($this->lastUpdatedUnit);
+        $definition = $this->unit->getUnitDefinitions($unit);
 
-        return $this->_convert($this->calculated, $definition['value'], $definition['operator'], true);
+        return $this->_convert($calculated, $definition['value'], $definition['operator'], true);
     }
 
     /**
@@ -133,6 +153,36 @@ final class Result
      */
     public function __toString(): string
     {
-        return $this->calculated;
+        return (string) $this->get();
+    }
+
+    /**
+     * Converts the result into a structured array.
+     *
+     * @return array{time: float|int|null, unit: string, formatted: string|null}
+     */
+    public function toArray(): array
+    {
+        return [
+            'time'      => $this->calculated,
+            'unit'      => $this->lastUpdatedUnit,
+            'formatted' => $this->format !== null && $this->calculated !== null
+                ? $this->render($this->format)
+                : null,
+        ];
+    }
+
+    /**
+     * Renders the calculated time with the given named-placeholder template.
+     *
+     * @param string $format The display format template.
+     * @return string The rendered result.
+     */
+    private function render(string $format): string
+    {
+        return strtr($format, [
+            '{time}' => (string) $this->calculated,
+            '{unit}' => $this->lastUpdatedUnit,
+        ]);
     }
 }
