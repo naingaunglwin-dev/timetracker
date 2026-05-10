@@ -1,19 +1,16 @@
 <?php
 
+use NAL\TimeTracker\Exception\DivisionByZero;
+use NAL\TimeTracker\Exception\InvalidUnitName;
 use NAL\TimeTracker\Exception\NoActivePausedTimerToResume;
 use NAL\TimeTracker\Exception\NoActiveTimerToStopException;
 use NAL\TimeTracker\Exception\TimerAlreadyPaused;
 use NAL\TimeTracker\Exception\TimerNotStarted;
 use NAL\TimeTracker\Exception\UnmatchedPauseWithoutResume;
-use NAL\TimeTracker\TimerStatus;
-use PHPUnit\Framework\TestCase;
-use NAL\TimeTracker\TimeTracker;
-use NAL\TimeTracker\Result;
-use NAL\TimeTracker\Unit;
-use NAL\TimeTracker\Exception\DivisionByZero;
-use NAL\TimeTracker\Exception\InvalidUnitName;
-use NAL\TimeTracker\Exception\UnknownUnit;
 use NAL\TimeTracker\Exception\UnsupportedLogic;
+use NAL\TimeTracker\TimerStatus;
+use NAL\TimeTracker\TimeTracker;
+use PHPUnit\Framework\TestCase;
 
 class TimeTrackerTest extends TestCase
 {
@@ -23,7 +20,7 @@ class TimeTrackerTest extends TestCase
         $id = 'test_timer';
 
         $tracker->start($id);
-        usleep(50000); // 50ms delay
+        usleep(50000);
         $tracker->stop($id);
 
         $result = $tracker->calculate($id);
@@ -32,7 +29,7 @@ class TimeTrackerTest extends TestCase
         $this->assertGreaterThan(0, $result->get());
     }
 
-    public function testEndWithInvalidId()
+    public function testEndWithInvalidId(): void
     {
         $this->expectException(TimerNotStarted::class);
         $tracker = new TimeTracker();
@@ -40,7 +37,7 @@ class TimeTrackerTest extends TestCase
         $tracker->stop('invalid_timer');
     }
 
-    public function testCalculateWithInvalidId()
+    public function testCalculateWithInvalidId(): void
     {
         $tracker = new TimeTracker();
 
@@ -66,22 +63,20 @@ class TimeTrackerTest extends TestCase
     public function testWatch(): void
     {
         $result = TimeTracker::watch(function () {
-            usleep(50000); // 50ms delay
+            usleep(50000);
         });
 
         $this->assertArrayHasKey('result', $result);
         $this->assertArrayHasKey('time', $result);
-        $this->assertArrayHasKey('unit', $result);
-        $this->assertArrayHasKey('output', $result);
-        $this->assertGreaterThan(0, $result['time']);
+        $this->assertGreaterThan(0, $result['time']->get());
     }
 
-    public function testWatchWithExceptionThrow()
+    public function testWatchWithExceptionThrow(): void
     {
         $this->expectException(RuntimeException::class);
 
-        $result = TimeTracker::watch(function () {
-            usleep(50000); // 50ms delay
+        TimeTracker::watch(function () {
+            usleep(50000);
             invalidFunction();
         });
     }
@@ -127,11 +122,11 @@ class TimeTrackerTest extends TestCase
         $id2 = 'timer2';
 
         $tracker->start($id1);
-        usleep(10000); // 10ms delay
+        usleep(10000);
         $tracker->stop($id1);
 
         $tracker->start($id2);
-        usleep(20000); // 20ms delay
+        usleep(20000);
         $tracker->stop($id2);
 
         $durations = $tracker->durations();
@@ -139,143 +134,44 @@ class TimeTrackerTest extends TestCase
         $this->assertCount(2, $durations);
         $this->assertArrayHasKey($id1, $durations);
         $this->assertArrayHasKey($id2, $durations);
+        $this->assertIsString($durations[$id1]);
+        $this->assertIsString($durations[$id2]);
+        $this->assertStringEndsWith(' ms', $durations[$id1]);
+        $this->assertStringEndsWith(' ms', $durations[$id2]);
     }
 
     public function testResetFunctionality(): void
     {
         $timeTracker = new TimeTracker();
 
-        // Start multiple timers
         $timeTracker->start('timer1');
         $timeTracker->start('timer2');
         $timeTracker->stop('timer1');
         $timeTracker->stop('timer2');
 
-        // Verify timers exist
         $this->assertTrue($timeTracker->exists('timer1'));
         $this->assertTrue($timeTracker->exists('timer2'));
 
-        // Reset a specific timer
         $timeTracker->reset('timer1');
         $this->assertFalse($timeTracker->exists('timer1'));
         $this->assertTrue($timeTracker->exists('timer2'));
 
-        // Reset all timers
         $timeTracker->reset();
         $this->assertFalse($timeTracker->exists('timer2'));
     }
 
-    // Result class
-    public function testFormat(): void
-    {
-        $unit = new Unit();
-        $result = new Result($unit, 123.456, 'ms');
-
-        $formatted = $result->format('%s %s');
-
-        $this->assertSame('123.456 ms', $formatted->get());
-    }
-
-    public function testConvert(): void
-    {
-        $unit = new Unit();
-        $result = new Result($unit, 1, 's');
-
-        $converted = $result->convert('ms');
-
-        $this->assertSame(1000, $converted->get());
-    }
-
-    public function testUnknownUnit(): void
-    {
-        $this->expectException(UnknownUnit::class);
-
-        $unit = new Unit();
-        $result = new Result($unit, 1, 's');
-        $result->convert('unknown_unit');
-    }
-
-    /**
-     * Test for reversion, that unit is always convert back to second whenever user convert to another unit
-     *
-     * @return void
-     */
-    public function testConvertOneUnitToAnotherUnit()
-    {
-        $unit = new Unit();
-        $result = new Result($unit, 1, 's');
-
-        $convertedDivision = $result->convert('ms')->convert('us');
-
-        $convertedMultiply = $result->convert('m');
-
-        $unit->add('minus', '-', '10');
-        $unit->add('plus', '+', '10');
-
-        $convertedPlus = $result->convert('minus');
-        $convertedMinus = $result->convert('plus');
-
-        $this->assertSame(1000000, $convertedDivision->get());
-        $this->assertSame(1 / 60, $convertedMultiply->get());
-        $this->assertSame(-9, $convertedPlus->get());
-        $this->assertSame(11, $convertedMinus->get());
-    }
-
-    //Unit class
-    public function testAddCustomUnit(): void
-    {
-        $unit = new Unit();
-        $unit->add('custom', '*', 500);
-
-        $this->assertContains('custom', $unit->getSupportedUnits());
-    }
-
-    public function testAddCustomUnitWhichAlreadyExist()
-    {
-        $this->expectException(InvalidUnitName::class);
-
-        $unit = new Unit();
-        $unit->add('ms', '*', 1000);
-    }
-
-    public function testGetCustomUnits(): void
-    {
-        $unit = new Unit();
-        $unit->add('custom', '*', 500);
-        $customUnits = $unit->getCustomUnits();
-
-        $this->assertSame(['custom'], $customUnits);
-    }
-
-    public function testGetUnitDefinitions(): void
-    {
-        $unit = new Unit();
-
-        $definition = $unit->getUnitDefinitions('ms');
-
-        $this->assertSame(['operator' => '*', 'value' => 1000], $definition);
-    }
-
-    public function testResultToString(): void
-    {
-        $result = new Result(new Unit(), 10, 's');
-        $this->assertSame('10', "$result");
-    }
-
-    public function testStopWithoutSpecificId()
+    public function testStopWithoutSpecificId(): void
     {
         $timetracker = new TimeTracker();
 
         $timetracker->start('timer1');
-
-        usleep(10000); // 10ms delay
-
+        usleep(10000);
         $timetracker->stop();
 
         $this->assertTrue($timetracker->exists('timer1'));
     }
 
-    public function testStopThrowExceptionOnCallingWithoutActiveStartRecord()
+    public function testStopThrowExceptionOnCallingWithoutActiveStartRecord(): void
     {
         $this->expectException(NoActiveTimerToStopException::class);
 
@@ -286,17 +182,17 @@ class TimeTrackerTest extends TestCase
         $timetracker->stop();
     }
 
-    public function testStopThrowExceptionOnCallingWithoutStartRecord()
+    public function testStopThrowExceptionOnCallingWithoutStartRecord(): void
     {
         $this->expectException(TimerNotStarted::class);
 
         $timetracker = new TimeTracker();
 
         $timetracker->start('timer1');
-        $timetracker->stop('timer2'); //non-existing timer
+        $timetracker->stop('timer2');
     }
 
-    public function testIsStarted()
+    public function testIsStarted(): void
     {
         $timetracker = new TimeTracker();
 
@@ -306,7 +202,7 @@ class TimeTrackerTest extends TestCase
         $this->assertFalse($timetracker->isStarted('timer2'));
     }
 
-    public function testIsStopped()
+    public function testIsStopped(): void
     {
         $timetracker = new TimeTracker();
 
@@ -318,14 +214,14 @@ class TimeTrackerTest extends TestCase
         $this->assertFalse($timetracker->isStopped('timer2'));
     }
 
-    public function testGetEmptyActiveTimersWhenNoActiveRecord()
+    public function testGetEmptyActiveTimersWhenNoActiveRecord(): void
     {
         $timetracker = new TimeTracker();
 
         $this->assertEmpty($timetracker->getActiveTimers());
     }
 
-    public function testGetActiveTimers()
+    public function testGetActiveTimers(): void
     {
         $timetracker = new TimeTracker();
 
@@ -335,17 +231,17 @@ class TimeTrackerTest extends TestCase
         $this->assertSame(['timer1', 'timer2'], $timetracker->getActiveTimers());
     }
 
-    public function testLap()
+    public function testLap(): void
     {
         $timetracker = new TimeTracker();
 
         $timetracker->start('timer1');
 
-        usleep(10000); // 10ms delay
-        $timetracker->lap('timer1', "After 10ms delay");
+        usleep(10000);
+        $timetracker->lap('timer1', 'After 10ms delay');
 
-        usleep(20000); // 20ms delay
-        $timetracker->lap('timer1', "After 20ms delay");
+        usleep(20000);
+        $timetracker->lap('timer1', 'After 20ms delay');
 
         $timetracker->stop();
 
@@ -359,7 +255,7 @@ class TimeTrackerTest extends TestCase
         }
     }
 
-    public function testLapThrowExceptionOnCallingWithoutTimerStarted()
+    public function testLapThrowExceptionOnCallingWithoutTimerStarted(): void
     {
         $this->expectException(TimerNotStarted::class);
 
@@ -368,7 +264,7 @@ class TimeTrackerTest extends TestCase
         $timetracker->lap('timer1');
     }
 
-    public function testPauseThrowsExceptionIfTimerNotStarted()
+    public function testPauseThrowsExceptionIfTimerNotStarted(): void
     {
         $tracker = new TimeTracker();
 
@@ -377,7 +273,7 @@ class TimeTrackerTest extends TestCase
         $tracker->pause('task');
     }
 
-    public function testPauseWorksWhenTimerIsStarted()
+    public function testPauseWorksWhenTimerIsStarted(): void
     {
         $tracker = new TimeTracker();
 
@@ -391,7 +287,7 @@ class TimeTrackerTest extends TestCase
         $this->assertIsFloat($pauseData['time']);
     }
 
-    public function testPauseThrowsIfAlreadyPausedAndNotResumed()
+    public function testPauseThrowsIfAlreadyPausedAndNotResumed(): void
     {
         $tracker = new TimeTracker();
 
@@ -400,11 +296,10 @@ class TimeTrackerTest extends TestCase
 
         $this->expectException(TimerAlreadyPaused::class);
 
-        // second pause should fail
         $tracker->pause('task');
     }
 
-    public function testResumeThrowsExceptionIfTimerNotStarted()
+    public function testResumeThrowsExceptionIfTimerNotStarted(): void
     {
         $tracker = new TimeTracker();
 
@@ -413,7 +308,7 @@ class TimeTrackerTest extends TestCase
         $tracker->resume('task');
     }
 
-    public function testResumeThrowsIfNoActivePause()
+    public function testResumeThrowsIfNoActivePause(): void
     {
         $tracker = new TimeTracker();
         $tracker->start('task');
@@ -423,7 +318,7 @@ class TimeTrackerTest extends TestCase
         $tracker->resume('task');
     }
 
-    public function testResumeWorksAfterPause()
+    public function testResumeWorksAfterPause(): void
     {
         $tracker = new TimeTracker();
 
@@ -439,7 +334,7 @@ class TimeTrackerTest extends TestCase
         $this->assertIsFloat($resumeData['time']);
     }
 
-    public function testMultiplePauseResumeCycles()
+    public function testMultiplePauseResumeCycles(): void
     {
         $tracker = new TimeTracker();
 
@@ -460,13 +355,12 @@ class TimeTrackerTest extends TestCase
         $this->assertTrue(true);
     }
 
-    public function testCalculateThrowsExceptionForUnmatchedPause()
+    public function testCalculateThrowsExceptionForUnmatchedPause(): void
     {
         $tracker = new TimeTracker();
 
         $id = 'task';
 
-        // Start timer and create pause/resume cycle with unmatched pause
         $tracker->start($id);
         usleep(5000);
 
@@ -482,12 +376,11 @@ class TimeTrackerTest extends TestCase
         $tracker->calculate($id);
     }
 
-    public function testInspectMethod()
+    public function testInspectMethod(): void
     {
         $tracker = new TimeTracker();
         $id = 'inspect_timer';
 
-        // Test inspect for non-started timer
         $inspectData = $tracker->inspect($id);
         $this->assertNull($inspectData['start']);
         $this->assertNull($inspectData['end']);
@@ -496,7 +389,6 @@ class TimeTrackerTest extends TestCase
         $this->assertSame(TimerStatus::NOT_STARTED->value, $inspectData['status']);
         $this->assertEmpty($inspectData['laps']);
 
-        // Start timer and add comprehensive data
         $tracker->start($id);
         usleep(5000);
 

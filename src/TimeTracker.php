@@ -268,63 +268,12 @@ class TimeTracker
     }
 
     /**
-     * @codeCoverageIgnore
-     *
-     * Executes a callback while tracking its execution time.
-     *
-     * @deprecated Use `watch` instead
-     *
-     * @param callable $callback The callback function to execute.
-     * @param array $params Parameters to pass to the callback.
-     * @param string $unit The unit for measuring execution time.
-     * @return array{result: Result, time: float|int, unit: string, output: mixed} An array containing Result, the execution time, unit, and callback result.
-     */
-    public static function run(callable $callback, array $params = [], string $unit = 's'): array
-    {
-        $timeTracker = new self();
-
-        $randomId = bin2hex(random_bytes(16));
-
-        $container = new Container();
-
-        $timeTracker->start($randomId);
-
-        try {
-
-            $output = $container->call($callback, $params);
-
-        } catch (\Throwable $e) {
-            $timeTracker->stop($randomId);
-
-            throw new \RuntimeException(
-                $timeTracker->calculate($randomId)->format('Error occurring during executing callback, end in %s%s')->get() .
-                "\n{$e->getMessage()}",
-                $e->getCode(),
-                $e
-            );
-        } finally {
-            if (!$timeTracker->isStopped($randomId)) {
-                $timeTracker->stop($randomId);
-            }
-        }
-
-        $result = $timeTracker->calculate($randomId);
-
-        return [
-            'result' => $result,
-            'time'   => $result->convert($unit)->get(),
-            'unit'   => $unit,
-            'output' => $output ?? null
-        ];
-    }
-
-    /**
      * Executes a callback while tracking its execution time.
      *
      * @param callable $callback The callback function to execute.
      * @param array $params Parameters to pass to the callback.
      * @param string $unit The unit for measuring execution time.
-     * @return array{result: Result, time: float|int, unit: string, output: mixed} An array containing Result, the execution time, unit, and callback result.
+     * @return array{result: mixed, time: Result} An array containing Time Result and callback result.
      */
     public static function watch(callable $callback, array $params = [], string $unit = 's'): array
     {
@@ -338,13 +287,13 @@ class TimeTracker
 
         try {
 
-            $output = $container->call($callback, $params);
+            $result = $container->call($callback, $params);
 
         } catch (\Throwable $e) {
             $timeTracker->stop($randomId);
 
             throw new \RuntimeException(
-                $timeTracker->calculate($randomId)->format('Error occurring during executing callback, end in %s%s')->get() .
+                $timeTracker->calculate($randomId)->format('Error occurring during executing callback, ended in {time}{unit}')->get() .
                 "\n{$e->getMessage()}",
                 $e->getCode(),
                 $e
@@ -355,13 +304,11 @@ class TimeTracker
             }
         }
 
-        $result = $timeTracker->calculate($randomId);
+        $executionTime = $timeTracker->calculate($randomId);
 
         return [
-            'result' => $result,
-            'time'   => $result->convert($unit)->get(),
-            'unit'   => $unit,
-            'output' => $output ?? null
+            'result' => $result ?? null,
+            'time' => $executionTime
         ];
     }
 
@@ -468,17 +415,17 @@ class TimeTracker
      * Returns an array of durations for all tracked timers.
      *
      * @param string $unit The unit for the duration (default is 'ms').
-     * @param string $format The format string for the result (default is '%s %s').
+     * @param string $format The format string for the result (default is '{time} {unit}').
      * @return array An array where the keys are timer IDs and the values are the calculated durations.
      */
-    public function durations(string $unit = 'ms', string $format = '%s %s'): array
+    public function durations(string $unit = 'ms', string $format = '{time} {unit}'): array
     {
         $result = [];
         foreach ($this->end as $id => $time) {
             $calculate = $this->calculate($id)->convert($unit);
 
             if (!empty($format)) {
-                $calculate->format($format);
+                $calculate = $calculate->format($format);
             }
 
             $result[$id] = $calculate->get();
